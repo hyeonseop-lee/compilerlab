@@ -31,3 +31,8 @@ Building:
 ```sh
 g++ --std=c++11 *.cc -o parser
 ```
+
+### Running Application
+```sh
+./parser < SampleTestInput.txt
+```
