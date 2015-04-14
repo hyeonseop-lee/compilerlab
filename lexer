@@ -1,0 +1,33 @@
+%%
+
+[ \t\n]+
+int						return Parser::INT;
+float					return Parser::FLOAT;
+return					return Parser::RETURN;
+while					return Parser::WHILE;
+do						return Parser::DO;
+for						return Parser::FOR;
+if						return Parser::IF;
+else					return Parser::ELSE;
+switch					return Parser::SWITCH;
+case					return Parser::CASE;
+default					return Parser::DEFAULT;
+break					return Parser::BREAK;
+\[						return Parser::LBRACKET;
+\]						return Parser::RBRACKET;
+\(						return Parser::LPAREN;
+\)						return Parser::RPAREN;
+\{						return Parser::LBRACE;
+\}						return Parser::RBRACE;
+:						return Parser::COLON;
+;						return Parser::SEMICOLON;
+,						return Parser::COMA;
+-						return Parser::UNOP;
+\*|\/					return Parser::MDOP;
+\+|\-					return Parser::ASOP;
+\<|\>|(\<=)|(\>=)		return Parser::RLOP;
+(==)|(!=)				return Parser::EQOP;
+=						return Parser::EQUAL;
+[A-Za-z][A-Za-z0-9_]*	return Parser::ID;
+[0-9]+					return Parser::INTNUM;
+[0-9]+\.[0-9]+			return Parser::FLOATNUM;

@@ -1,0 +1,196 @@
+%scanner Scanner.h
+
+%right EQUAL
+%left EQOP
+%left RLOP
+%left ASOP
+%left MDOP
+%right UNOP
+%left LPAREN RPAREN
+%token ID INTNUM FLOATNUM INT FLOAT RETURN WHILE DO FOR IF ELSE SWITCH CASE DEFAULT BREAK LBRACKET RBRACKET LBRACE RBRACE COLON SEMICOLON COMA
+
+%%
+
+Program:
+	
+|
+	FuncList
+|
+	DeclList
+|
+	DeclList FuncList
+;
+
+DeclList:
+	Declaration
+|
+	DeclList Declaration
+;
+
+FuncList:
+	Function
+|
+	FuncList Function
+;
+
+Declaration:
+	Type IdentList SEMICOLON
+;
+
+IdentList:
+	identifier
+|
+	IdentList COMA identifier
+;
+
+identifier:
+	ID
+|
+	ID LBRACKET INTNUM RBRACKET
+;
+
+Function:
+	Type ID LPAREN RPAREN CompoundStmt
+|
+	Type ID LPAREN ParamList RPAREN CompoundStmt
+;
+
+ParamList:
+	Type identifier
+|
+	ParamList COMA Type identifier
+;
+
+Type:
+	INT
+|
+	FLOAT
+;
+
+CompoundStmt:
+	LBRACE StmtList RBRACE
+|
+	LBRACE DeclList StmtList RBRACE
+;
+
+StmtList:
+	
+|
+	StmtList Stmt
+;
+
+Stmt:
+	AssignStmt
+|
+	CallStmt
+|
+	RetStmt
+|
+	WhileStmt
+|
+	ForStmt
+|
+	IfStmt
+|
+	SwitchStmt
+|
+	CompoundStmt
+|
+	SEMICOLON
+;
+
+AssignStmt:
+	Assign SEMICOLON
+;
+
+Assign:
+	ID EQUAL Expr
+|
+	ID LBRACKET Expr RBRACKET EQUAL Expr
+;
+
+CallStmt:
+	Call SEMICOLON
+;
+
+Call:
+	ID LPAREN RPAREN
+|
+	ID LPAREN ArgList RPAREN
+;
+
+RetStmt:
+	RETURN SEMICOLON
+|
+	RETURN Expr SEMICOLON
+;
+
+WhileStmt:
+	WHILE LPAREN Expr RPAREN Stmt
+|
+	DO Stmt WHILE LPAREN Expr RPAREN
+;
+
+ForStmt:
+	FOR LPAREN Assign SEMICOLON Expr SEMICOLON Assign RPAREN Stmt
+;
+
+IfStmt:
+	IF LPAREN Expr RPAREN Stmt
+|
+	IF LPAREN Expr RPAREN Stmt ELSE Stmt
+;
+
+SwitchStmt:
+	SWITCH LPAREN identifier LPAREN LBRACE CaseList RBRACE
+;
+
+CaseList:
+	CaseOnlyList
+|
+	CaseOnlyList DEFAULT COLON StmtList
+|
+	CaseOnlyList DEFAULT COLON StmtList BREAK SEMICOLON
+;
+
+CaseOnlyList:
+	
+|
+	CaseOnlyList CASE INTNUM COLON StmtList
+|
+	CaseOnlyList CASE INTNUM COLON StmtList BREAK SEMICOLON
+;
+
+BinOp:
+	MDOP
+|
+	ASOP
+|
+	RLOP
+|
+	EQOP
+;
+
+Expr:
+	UNOP Expr
+|
+	Expr BinOp Expr
+|
+	Call
+|
+	INTNUM
+|
+	FLOATNUM
+|
+	ID
+|
+	ID LBRACKET Expr RBRACKET
+|
+	LPAREN Expr RPAREN
+;
+
+ArgList:
+	Expr
+|
+	ArgList COMA  Expr
+;
