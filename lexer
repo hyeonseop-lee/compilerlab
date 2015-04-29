@@ -24,7 +24,7 @@ break					return Parser::BREAK;
 ,						return Parser::COMA;
 -						return Parser::UNOP;
 \*|\/					return Parser::MDOP;
-\+|\-					return Parser::ASOP;
+\+						return Parser::ASOP;
 \<|\>|(\<=)|(\>=)		return Parser::RLOP;
 (==)|(!=)				return Parser::EQOP;
 =						return Parser::EQUAL;

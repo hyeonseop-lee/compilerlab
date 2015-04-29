@@ -142,7 +142,7 @@ IfStmt:
 ;
 
 SwitchStmt:
-	SWITCH LPAREN identifier LPAREN LBRACE CaseList RBRACE
+	SWITCH LPAREN identifier RPAREN LBRACE CaseList RBRACE
 ;
 
 CaseList:
@@ -165,6 +165,8 @@ BinOp:
 	MDOP
 |
 	ASOP
+|
+	UNOP
 |
 	RLOP
 |
