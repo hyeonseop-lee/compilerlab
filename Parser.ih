@@ -4,11 +4,12 @@
 
 // $insert class.h
 #include "Parser.h"
+#include "ast.h"
 
 
 inline void Parser::error(char const *msg)
 {
-    std::cerr << d_scanner.filename() << ":" << d_scanner.lineNr() << " " << msg << " on " << d_scanner.matched() << std::endl;
+    std::cerr << "line " << d_scanner.lineNr() << ": " << msg << " on " << d_scanner.matched() << std::endl;
 }
 
 // $insert lex
@@ -37,4 +38,5 @@ inline void Parser::exceptionHandler__(std::exception const &exc)
     // int Parser's sources symbols from the namespace std without
     // specifying std::
 
-//using namespace std;
+using namespace std;
+using namespace ast;

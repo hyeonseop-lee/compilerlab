@@ -1,11 +1,13 @@
 %scanner Scanner.h
 
+%stype void*
+
 %right EQUAL
-%left EQOP
-%left RLOP
-%left ASOP
-%left MDOP
-%right UNOP
+%left EQ NE
+%left LT GT LE GE
+%left PLUS
+%left MUL DIV
+%right MINUS
 %left LPAREN RPAREN
 %token ID INTNUM FLOATNUM INT FLOAT RETURN WHILE DO FOR IF ELSE SWITCH CASE DEFAULT BREAK LBRACKET RBRACKET LBRACE RBRACE COLON SEMICOLON COMA
 
@@ -13,186 +15,433 @@
 
 Program:
 	
+	{
+		$$ = (void *)new Program(NULL, NULL);
+	}
 |
 	FuncList
+	{
+		$$ = (void *)new Program(NULL, (List *)$1);
+	}
 |
 	DeclList
+	{
+		$$ = (void *)new Program((List *)$1, NULL);
+	}
 |
 	DeclList FuncList
+	{
+		$$ = (void *)new Program((List *)$1, (List *)$2);
+	}
 ;
 
 DeclList:
 	Declaration
+	{
+		$$ = (void *)new List((Base *)$1);
+	}
 |
 	DeclList Declaration
+	{
+		$$ = (void *)new List((Base *)$2, (List *)$1);
+	}
 ;
 
 FuncList:
 	Function
+	{
+		$$ = (void *)new List((Base *)$1);
+	}
 |
 	FuncList Function
+	{
+		$$ = (void *)new List((Base *)$2, (List *)$1);
+	}
 ;
 
 Declaration:
 	Type IdentList SEMICOLON
+	{
+		$$ = (void *)new Declaration((Type *)$1, (List *)$2);
+	}
 ;
 
 IdentList:
 	identifier
+	{
+		$$ = (void *)new List((Base *)$1);
+	}
 |
 	IdentList COMA identifier
+	{
+		$$ = (void *)new List((Base *)$3, (List *)$1);
+	}
 ;
 
 identifier:
-	ID
+	Symbol
+	{
+		$$ = (void *)new Identifier((Symbol *)$1);
+	}
 |
-	ID LBRACKET INTNUM RBRACKET
+	Symbol LBRACKET IntNum RBRACKET
+	{
+		$$ = (void *)new IndexedIdentifier((Symbol *)$1, (IntNum *)$3);
+	}
 ;
 
 Function:
-	Type ID LPAREN RPAREN CompoundStmt
+	Type Symbol LPAREN RPAREN CompoundStmt
+	{
+		$$ = (void *)new Function ((Type *)$1, (Symbol *)$2, NULL, (CompoundStmt *)$5);
+	}
 |
-	Type ID LPAREN ParamList RPAREN CompoundStmt
+	Type Symbol LPAREN ParamList RPAREN CompoundStmt
+	{
+		$$ = (void *)new Function ((Type *)$1, (Symbol *)$2, (List *)$4, (CompoundStmt *)$6);
+	}
 ;
 
 ParamList:
 	Type identifier
+	{
+		$$ = (void *)new List((Base *)new Parameter((Type *)$1, (Identifier *)$2));
+	}
 |
 	ParamList COMA Type identifier
+	{
+		$$ = (void *)new List((Base *)new Parameter((Type *)$3, (Identifier *)$4), (List *)$1);
+	}
+;
+
+Symbol:
+	ID
+	{
+		$$ = (void *)new Symbol(d_scanner.lineNr(), d_scanner.matched());
+	}
+;
+
+IntNum:
+	INTNUM
+	{
+		$$ = (void *)new IntNum(d_scanner.lineNr(), d_scanner.matched());
+	}
+;
+
+FloatNum:
+	FLOATNUM
+	{
+		$$ = (void *)new FloatNum(d_scanner.lineNr(), d_scanner.matched());
+	}
 ;
 
 Type:
 	INT
+	{
+		$$ = (void *)new Type(Type::INT);
+	}
 |
 	FLOAT
+	{
+		$$ = (void *)new Type(Type::FLOAT);
+	}
 ;
 
 CompoundStmt:
 	LBRACE StmtList RBRACE
+	{
+		$$ = (void *)new CompoundStmt(NULL, (List *)$2);
+	}
 |
 	LBRACE DeclList StmtList RBRACE
+	{
+		$$ = (void *)new CompoundStmt((List *)$2, (List *)$3);
+	}
 ;
 
 StmtList:
 	
+	{
+		$$ = NULL;
+	}
 |
 	StmtList Stmt
+	{
+		$$ = (void *)new List((Base *)$2, (List *)$1);
+	}
 ;
 
 Stmt:
 	AssignStmt
+	{
+		$$ = $1;
+	}
 |
 	CallStmt
+	{
+		$$ = $1;
+	}
 |
 	RetStmt
+	{
+		$$ = $1;
+	}
 |
 	WhileStmt
+	{
+		$$ = $1;
+	}
 |
 	ForStmt
+	{
+		$$ = $1;
+	}
 |
 	IfStmt
+	{
+		$$ = $1;
+	}
 |
 	SwitchStmt
+	{
+		$$ = $1;
+	}
 |
 	CompoundStmt
+	{
+		$$ = $1;
+	}
 |
 	SEMICOLON
+	{
+		$$ = (void *)new Stmt();
+	}
 ;
 
 AssignStmt:
 	Assign SEMICOLON
+	{
+		$$ = (void *)new AssignStmt((Assign *)$1);
+	}
 ;
 
 Assign:
-	ID EQUAL Expr
+	Symbol EQUAL Expr
+	{
+		$$ = (void *)new Assign((Symbol *)$1, (Expr *)$3);
+	}
 |
-	ID LBRACKET Expr RBRACKET EQUAL Expr
+	Symbol LBRACKET Expr RBRACKET EQUAL Expr
+	{
+		$$ = (void *)new IndexedAssign((Symbol *)$1, (Expr *)$3, (Expr *)$6);
+	}
 ;
 
 CallStmt:
 	Call SEMICOLON
+	{
+		$$ = (void *)new CallStmt((Call *)$1);
+	}
 ;
 
 Call:
-	ID LPAREN RPAREN
+	Symbol LPAREN RPAREN
+	{
+		$$ = (void *)new Call((Symbol *)$1);
+	}
 |
-	ID LPAREN ArgList RPAREN
+	Symbol LPAREN ArgList RPAREN
+	{
+		$$ = (void *)new Call((Symbol *)$1, (List *)$3);
+	}
 ;
 
 RetStmt:
 	RETURN SEMICOLON
+	{
+		$$ = (void *)new RetStmt();
+	}
 |
 	RETURN Expr SEMICOLON
+	{
+		$$ = (void *)new RetStmt((Expr *)$2);
+	}
 ;
 
 WhileStmt:
 	WHILE LPAREN Expr RPAREN Stmt
+	{
+		$$ = (void *)new WhileStmt((Expr *)$3, (Stmt *)$5);
+	}
 |
 	DO Stmt WHILE LPAREN Expr RPAREN
+	{
+		$$ = (void *)new DoWhileStmt((Expr *)$5, (Stmt *)$2);
+	}
 ;
 
 ForStmt:
 	FOR LPAREN Assign SEMICOLON Expr SEMICOLON Assign RPAREN Stmt
+	{
+		$$ = (void *)new ForStmt((Assign *)$3, (Expr *)$5, (Assign *)$7, (Stmt *)$9);
+	}
 ;
 
 IfStmt:
 	IF LPAREN Expr RPAREN Stmt
+	{
+		$$ = (void *)new IfStmt((Expr *)$3, (Stmt *)$5);
+	}
 |
 	IF LPAREN Expr RPAREN Stmt ELSE Stmt
+	{
+		$$ = (void *)new IfStmt((Expr *)$3, (Stmt *)$5, (Stmt *)$7);
+	}
 ;
 
 SwitchStmt:
 	SWITCH LPAREN identifier RPAREN LBRACE CaseList RBRACE
+	{
+		$$ = (void *)new SwitchStmt((Identifier *)$3, (List *)$6);
+	}
 ;
 
 CaseList:
 	CaseOnlyList
+	{
+		$$ = $1;
+	}
 |
 	CaseOnlyList DEFAULT COLON StmtList
+	{
+		$$ = (void *)new List((Base *)new DefaultCase((List *)$4, false), (List *)$1);
+	}
 |
 	CaseOnlyList DEFAULT COLON StmtList BREAK SEMICOLON
+	{
+		$$ = (void *)new List((Base *)new DefaultCase((List *)$4, true), (List *)$1);
+	}
 ;
 
 CaseOnlyList:
 	
+	{
+		$$ = NULL;
+	}
 |
-	CaseOnlyList CASE INTNUM COLON StmtList
+	CaseOnlyList CASE IntNum COLON StmtList
+	{
+		$$ = (void *)new List((Base *)new Case((IntNum *)$3, (List *)$5, false), (List *)$1);
+	}
 |
-	CaseOnlyList CASE INTNUM COLON StmtList BREAK SEMICOLON
+	CaseOnlyList CASE IntNum COLON StmtList BREAK SEMICOLON
+	{
+		$$ = (void *)new List((Base *)new Case((IntNum *)$3, (List *)$5, true), (List *)$1);
+	}
 ;
 
 BinOp:
-	MDOP
+	PLUS
+	{
+		$$ = (void *)BinOpExpr::PLUS;
+	}
 |
-	ASOP
+	MINUS
+	{
+		$$ = (void *)BinOpExpr::MINUS;
+	}
 |
-	UNOP
+	MUL
+	{
+		$$ = (void *)BinOpExpr::MUL;
+	}
 |
-	RLOP
+	DIV
+	{
+		$$ = (void *)BinOpExpr::DIV;
+	}
 |
-	EQOP
+	EQ
+	{
+		$$ = (void *)BinOpExpr::EQ;
+	}
+|
+	NE
+	{
+		$$ = (void *)BinOpExpr::NE;
+	}
+|
+	LT
+	{
+		$$ = (void *)BinOpExpr::LT;
+	}
+|
+	GT
+	{
+		$$ = (void *)BinOpExpr::GT;
+	}
+|
+	LE
+	{
+		$$ = (void *)BinOpExpr::LE;
+	}
+|
+	GE
+	{
+		$$ = (void *)BinOpExpr::GE;
+	}
 ;
 
 Expr:
-	UNOP Expr
+	MINUS Expr
+	{
+		$$ = (void *)new UnOpExpr(UnOpExpr::MINUS, (Expr *)$2);
+	}
 |
 	Expr BinOp Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, (BinOpExpr::BinOp)(long)$2, (Expr *)$3);
+	}
 |
 	Call
+	{
+		$$ = $1;
+	}
 |
-	INTNUM
+	IntNum
+	{
+		$$ = (void *)new IntNumExpr((IntNum *)$1);
+	}
 |
-	FLOATNUM
+	FloatNum
+	{
+		$$ = (void *)new FloatNumExpr((FloatNum *)$1);
+	}
 |
-	ID
+	Symbol
+	{
+		$$ = (void *)new SymbolExpr((Symbol *)$1);
+	}
 |
-	ID LBRACKET Expr RBRACKET
+	Symbol LBRACKET Expr RBRACKET
+	{
+		$$ = (void *)new IndexedSymbolExpr((Symbol *)$1, (Expr *)$3);
+	}
 |
 	LPAREN Expr RPAREN
+	{
+		$$ = $2;
+	}
 ;
 
 ArgList:
 	Expr
+	{
+		$$ = (void *)new List((Base *)$1);
+	}
 |
-	ArgList COMA  Expr
+	ArgList COMA Expr
+	{
+		$$ = (void *)new List((Expr *)$3, (List *)$1);
+	}
 ;
