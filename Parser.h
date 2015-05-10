@@ -17,6 +17,7 @@ class Parser: public ParserBase
         
     public:
         int parse();
+		void *getVal();
 
     private:
         void error(char const *msg);    // called on (syntax) errors

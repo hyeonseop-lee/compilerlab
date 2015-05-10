@@ -2,36 +2,36 @@
 
 %stype void*
 
+%token ID INTNUM FLOATNUM INT FLOAT RETURN WHILE DO FOR IF ELSE SWITCH CASE DEFAULT BREAK LBRACKET RBRACKET LBRACE RBRACE COLON SEMICOLON COMA
 %right EQUAL
 %left EQ NE
 %left LT GT LE GE
-%left PLUS
+%left PLUS MINUS
 %left MUL DIV
-%right MINUS
+%right NEG
 %left LPAREN RPAREN
-%token ID INTNUM FLOATNUM INT FLOAT RETURN WHILE DO FOR IF ELSE SWITCH CASE DEFAULT BREAK LBRACKET RBRACKET LBRACE RBRACE COLON SEMICOLON COMA
 
 %%
 
 Program:
 	
 	{
-		$$ = (void *)new Program(NULL, NULL);
+		Program::program = new Program(NULL, NULL);
 	}
 |
 	FuncList
 	{
-		$$ = (void *)new Program(NULL, (List *)$1);
+		Program::program = new Program(NULL, (List *)$1);
 	}
 |
 	DeclList
 	{
-		$$ = (void *)new Program((List *)$1, NULL);
+		Program::program = new Program((List *)$1, NULL);
 	}
 |
 	DeclList FuncList
 	{
-		$$ = (void *)new Program((List *)$1, (List *)$2);
+		Program::program = new Program((List *)$1, (List *)$2);
 	}
 ;
 
@@ -340,67 +340,60 @@ CaseOnlyList:
 	}
 ;
 
-BinOp:
-	PLUS
-	{
-		$$ = (void *)BinOpExpr::PLUS;
-	}
-|
-	MINUS
-	{
-		$$ = (void *)BinOpExpr::MINUS;
-	}
-|
-	MUL
-	{
-		$$ = (void *)BinOpExpr::MUL;
-	}
-|
-	DIV
-	{
-		$$ = (void *)BinOpExpr::DIV;
-	}
-|
-	EQ
-	{
-		$$ = (void *)BinOpExpr::EQ;
-	}
-|
-	NE
-	{
-		$$ = (void *)BinOpExpr::NE;
-	}
-|
-	LT
-	{
-		$$ = (void *)BinOpExpr::LT;
-	}
-|
-	GT
-	{
-		$$ = (void *)BinOpExpr::GT;
-	}
-|
-	LE
-	{
-		$$ = (void *)BinOpExpr::LE;
-	}
-|
-	GE
-	{
-		$$ = (void *)BinOpExpr::GE;
-	}
-;
-
 Expr:
-	MINUS Expr
+	MINUS Expr %prec NEG
 	{
 		$$ = (void *)new UnOpExpr(UnOpExpr::MINUS, (Expr *)$2);
 	}
 |
-	Expr BinOp Expr
+	Expr PLUS Expr
 	{
-		$$ = (void *)new BinOpExpr((Expr *)$1, (BinOpExpr::BinOp)(long)$2, (Expr *)$3);
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::PLUS, (Expr *)$3);
+	}
+|
+	Expr MINUS Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::MINUS, (Expr *)$3);
+	}
+|
+	Expr MUL Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::MUL, (Expr *)$3);
+	}
+|
+	Expr DIV Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::DIV, (Expr *)$3);
+	}
+|
+	Expr EQ Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::EQ, (Expr *)$3);
+	}
+|
+	Expr NE Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::NE, (Expr *)$3);
+	}
+|
+	Expr LT Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::LT, (Expr *)$3);
+	}
+|
+	Expr GT Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::GT, (Expr *)$3);
+	}
+|
+	Expr LE Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::LE, (Expr *)$3);
+	}
+|
+	Expr GE Expr
+	{
+		$$ = (void *)new BinOpExpr((Expr *)$1, BinOpExpr::GE, (Expr *)$3);
 	}
 |
 	Call

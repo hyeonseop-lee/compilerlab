@@ -13,6 +13,8 @@ class Base
 {
 public:
 	Base();
+
+	virtual string toString();
 };
 
 class List
@@ -36,6 +38,7 @@ protected:
 
 public:
 	Symbol(size_t _pos, string _symbol);
+	virtual string toString();
 };
 
 class IntNum:
@@ -71,6 +74,7 @@ protected:
 
 public:
 	Type(_Type _type);
+	virtual string toString();
 };
 
 class Identifier:
@@ -81,6 +85,7 @@ protected:
 
 public:
 	Identifier(Symbol *_name);
+	virtual string toString();
 };
 
 class IndexedIdentifier:
@@ -91,6 +96,7 @@ protected:
 
 public:
 	IndexedIdentifier(Symbol *_name, IntNum *_index);
+	virtual string toString();
 };
 
 class Declaration:
@@ -102,6 +108,7 @@ protected:
 
 public:
 	Declaration(Type *_type, List *_identifier);
+	virtual string toString();
 };
 
 class Parameter:
@@ -113,6 +120,7 @@ protected:
 
 public:
 	Parameter(Type *_type, Identifier *_identifier);
+	virtual string toString();
 };
 
 class Expr:
@@ -136,6 +144,7 @@ protected:
 
 public:
 	UnOpExpr(UnOp _unOp, Expr *_expr);
+	virtual string toString();
 };
 
 class BinOpExpr:
@@ -154,6 +163,7 @@ protected:
 
 public:
 	BinOpExpr(Expr *_left, BinOp _binOp, Expr *_right);
+	virtual string toString();
 };
 
 class IntNumExpr:
@@ -164,6 +174,7 @@ protected:
 
 public:
 	IntNumExpr(IntNum *_intNum);
+	virtual string toString();
 };
 
 class FloatNumExpr:
@@ -174,6 +185,7 @@ protected:
 
 public:
 	FloatNumExpr(FloatNum *_floatNum);
+	virtual string toString();
 };
 
 class SymbolExpr:
@@ -184,6 +196,7 @@ protected:
 
 public:
 	SymbolExpr(Symbol *_name);
+	virtual string toString();
 };
 
 class IndexedSymbolExpr:
@@ -194,6 +207,7 @@ protected:
 
 public:
 	IndexedSymbolExpr(Symbol *_name, Expr *_index);
+	virtual string toString();
 };
 
 class Stmt:
@@ -201,6 +215,7 @@ class Stmt:
 {
 public:
 	Stmt();
+	virtual string toString();
 };
 
 class Call:
@@ -212,6 +227,7 @@ protected:
 
 public:
 	Call(Symbol *_name, List *_expr = NULL);
+	virtual string toString();
 };
 
 class CallStmt:
@@ -222,6 +238,7 @@ protected:
 
 public:
 	CallStmt(Call *_call);
+	virtual string toString();
 };
 
 class Assign:
@@ -233,6 +250,7 @@ protected:
 
 public:
 	Assign(Symbol *_name, Expr *_expr);
+	virtual string toString();
 };
 
 class IndexedAssign:
@@ -244,6 +262,7 @@ protected:
 
 public:
 	IndexedAssign(Symbol *_name, Expr *_index, Expr *_expr);
+	virtual string toString();
 };
 
 class AssignStmt:
@@ -254,6 +273,7 @@ protected:
 
 public:
 	AssignStmt(Assign *_assign);
+	virtual string toString();
 };
 
 class RetStmt:
@@ -264,6 +284,7 @@ protected:
 
 public:
 	RetStmt(Expr *_expr = NULL);
+	virtual string toString();
 };
 
 class WhileStmt:
@@ -275,6 +296,7 @@ protected:
 
 public:
 	WhileStmt(Expr *_expr, Stmt *_stmt);
+	virtual string toString();
 };
 
 class DoWhileStmt:
@@ -282,6 +304,7 @@ class DoWhileStmt:
 {
 public:
 	DoWhileStmt(Expr *_expr, Stmt *_stmt);
+	virtual string toString();
 };
 
 class ForStmt:
@@ -295,6 +318,7 @@ protected:
 
 public:
 	ForStmt(Assign *_first, Expr *_second, Assign *_third, Stmt *_stmt);
+	virtual string toString();
 };
 
 class IfStmt:
@@ -306,6 +330,7 @@ protected:
 
 public:
 	IfStmt(Expr *_expr, Stmt *_than, Stmt *__else = NULL);
+	virtual string toString();
 };
 
 class Case:
@@ -318,6 +343,7 @@ protected:
 
 public:
 	Case(IntNum *_index, List *_stmt, bool __break);
+	virtual string toString();
 };
 
 class DefaultCase:
@@ -325,6 +351,7 @@ class DefaultCase:
 {
 public:
 	DefaultCase(List *_stmt, bool __break);
+	virtual string toString();
 };
 
 class SwitchStmt:
@@ -336,6 +363,7 @@ protected:
 
 public:
 	SwitchStmt(Identifier *_identifier, List *__case);
+	virtual string toString();
 };
 
 class CompoundStmt:
@@ -347,6 +375,7 @@ protected:
 
 public:
 	CompoundStmt(List *_declaration, List *_stmt);
+	virtual string toString();
 };
 
 
@@ -361,6 +390,7 @@ protected:
 
 public:
 	Function(Type *_type, Symbol *_name, List *_parameter, CompoundStmt *_compoundStmt);
+	virtual string toString();
 };
 
 class Program:
@@ -371,7 +401,10 @@ protected:
 	list<Function *> function;
 
 public:
+	static Program *program;
+
 	Program(List *_declaration, List *_function);
+	virtual string toString();
 };
 
 }
