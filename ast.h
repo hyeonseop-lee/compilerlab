@@ -3,9 +3,14 @@
 
 #include <string>
 #include <list>
+#include <map>
 
 namespace ast
 {
+
+class Traversal;
+class Entry;
+class Level;
 
 using namespace std;
 
@@ -15,15 +20,15 @@ public:
 	Base();
 
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class List
 {
-protected:
+public:
 	Base *head;
 	List *tail;
 
-public:
 	List(Base *_head, List *_tail = NULL);
 	Base *get();
 	List *next();
@@ -32,11 +37,10 @@ public:
 class Symbol:
 	public Base
 {
-protected:
+public:
 	size_t pos;
 	string symbol;
 
-public:
 	Symbol(size_t _pos, string _symbol);
 	virtual string toString();
 };
@@ -44,20 +48,18 @@ public:
 class IntNum:
 	public Symbol
 {
-protected:
+public:
 	int num;
 
-public:
 	IntNum(size_t _pos, string _symbol);
 };
 
 class FloatNum:
 	public Symbol
 {
-protected:
+public:
 	float num;
 
-public:
 	FloatNum(size_t _pos, string _symbol);
 };
 
@@ -69,10 +71,8 @@ public:
 		INT, FLOAT
 	};
 
-protected:
 	_Type type;
 
-public:
 	Type(_Type _type);
 	virtual string toString();
 };
@@ -80,53 +80,53 @@ public:
 class Identifier:
 	public Base
 {
-protected:
+public:
 	Symbol *name;
 
-public:
 	Identifier(Symbol *_name);
 	virtual string toString();
+	virtual void traverseWithType(Traversal *traversal, int level, Level *current, Type *type);
 };
 
 class IndexedIdentifier:
 	public Identifier
 {
-protected:
+public:
 	IntNum *index;
 
-public:
 	IndexedIdentifier(Symbol *_name, IntNum *_index);
 	virtual string toString();
+	virtual void traverseWithType(Traversal *traversal, int level, Level *current, Type *type);
 };
 
 class Declaration:
 	public Base
 {
-protected:
+public:
 	Type *type;
 	list<Identifier *> identifier;
 
-public:
 	Declaration(Type *_type, List *_identifier);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class Parameter:
 	public Base
 {
-protected:
+public:
 	Type *type;
 	Identifier *identifier;
 
-public:
 	Parameter(Type *_type, Identifier *_identifier);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class Expr:
 	public Base
 {
-protected:
+public:
 	Expr();
 };
 
@@ -138,11 +138,9 @@ public:
 		MINUS
 	};
 
-protected:
 	UnOp unOp;
 	Expr *expr;
 
-public:
 	UnOpExpr(UnOp _unOp, Expr *_expr);
 	virtual string toString();
 };
@@ -156,12 +154,10 @@ public:
 		EQ, NE, LT, LE, GT, GE
 	};
 
-protected:
 	Expr *left;
 	BinOp binOp;
 	Expr *right;
 
-public:
 	BinOpExpr(Expr *_left, BinOp _binOp, Expr *_right);
 	virtual string toString();
 };
@@ -169,10 +165,9 @@ public:
 class IntNumExpr:
 	public Expr
 {
-protected:
+public:
 	IntNum *intNum;
 
-public:
 	IntNumExpr(IntNum *_intNum);
 	virtual string toString();
 };
@@ -180,10 +175,9 @@ public:
 class FloatNumExpr:
 	public Expr
 {
-protected:
+public:
 	FloatNum *floatNum;
 
-public:
 	FloatNumExpr(FloatNum *_floatNum);
 	virtual string toString();
 };
@@ -191,10 +185,9 @@ public:
 class SymbolExpr:
 	public Expr
 {
-protected:
+public:
 	Symbol *name;
 
-public:
 	SymbolExpr(Symbol *_name);
 	virtual string toString();
 };
@@ -202,10 +195,9 @@ public:
 class IndexedSymbolExpr:
 	public SymbolExpr
 {
-protected:
+public:
 	Expr *index;
 
-public:
 	IndexedSymbolExpr(Symbol *_name, Expr *_index);
 	virtual string toString();
 };
@@ -221,11 +213,10 @@ public:
 class Call:
 	public Stmt, Expr
 {
-protected:
+public:
 	Symbol *name;
 	list<Expr *> expr;
 
-public:
 	Call(Symbol *_name, List *_expr = NULL);
 	virtual string toString();
 };
@@ -233,10 +224,9 @@ public:
 class CallStmt:
 	public Stmt
 {
-protected:
+public:
 	Call *call;
 
-public:
 	CallStmt(Call *_call);
 	virtual string toString();
 };
@@ -244,11 +234,10 @@ public:
 class Assign:
 	public Stmt
 {
-protected:
+public:
 	Symbol *name;
 	Expr *expr;
 
-public:
 	Assign(Symbol *_name, Expr *_expr);
 	virtual string toString();
 };
@@ -257,10 +246,9 @@ class IndexedAssign:
 	public Assign
 
 {
-protected:
+public:
 	Expr *index;
 
-public:
 	IndexedAssign(Symbol *_name, Expr *_index, Expr *_expr);
 	virtual string toString();
 };
@@ -268,10 +256,9 @@ public:
 class AssignStmt:
 	public Stmt
 {
-protected:
+public:
 	Assign *assign;
 
-public:
 	AssignStmt(Assign *_assign);
 	virtual string toString();
 };
@@ -279,10 +266,9 @@ public:
 class RetStmt:
 	public Stmt
 {
-protected:
+public:
 	Expr *expr;
 
-public:
 	RetStmt(Expr *_expr = NULL);
 	virtual string toString();
 };
@@ -290,13 +276,13 @@ public:
 class WhileStmt:
 	public Stmt
 {
-protected:
+public:
 	Expr *expr;
 	Stmt *stmt;
 
-public:
 	WhileStmt(Expr *_expr, Stmt *_stmt);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class DoWhileStmt:
@@ -310,40 +296,40 @@ public:
 class ForStmt:
 	public Stmt
 {
-protected:
+public:
 	Assign *first;
 	Expr *second;
 	Assign *third;
 	Stmt *stmt;
 
-public:
 	ForStmt(Assign *_first, Expr *_second, Assign *_third, Stmt *_stmt);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class IfStmt:
 	public Stmt
 {
-protected:
+public:
 	Expr *expr;
 	Stmt *than, *_else;
 
-public:
 	IfStmt(Expr *_expr, Stmt *_than, Stmt *__else = NULL);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *table);
 };
 
 class Case:
 	public Base
 {
-protected:
+public:
 	IntNum *index;
 	list<Stmt *> stmt;
 	bool _break;
 
-public:
 	Case(IntNum *_index, List *_stmt, bool __break);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class DefaultCase:
@@ -357,55 +343,81 @@ public:
 class SwitchStmt:
 	public Stmt
 {
-protected:
+public:
 	Identifier *identifier;
 	list<Case *> _case;
 
-public:
 	SwitchStmt(Identifier *_identifier, List *__case);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class CompoundStmt:
 	public Stmt
 {
-protected:
+public:
 	list<Declaration *> declaration;
 	list<Stmt *> stmt;
 
-public:
 	CompoundStmt(List *_declaration, List *_stmt);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 
 class Function:
 	public Base
 {
-protected:
+public:
 	Type *type;
 	Symbol *name;
 	list<Parameter *> parameter;
 	CompoundStmt *compoundStmt;
 
-public:
 	Function(Type *_type, Symbol *_name, List *_parameter, CompoundStmt *_compoundStmt);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
 
 class Program:
 	public Base
 {
-protected:
+public:
 	list<Declaration *> declaration;
 	list<Function *> function;
 
-public:
 	static Program *program;
 
 	Program(List *_declaration, List *_function);
 	virtual string toString();
+	virtual void traverse(Traversal *traversal, int level, Level *current);
 };
+
+class Traversal
+{
+public:
+	map<int, list<Level *> > level;
+
+	Traversal();
+};
+
+class Entry
+{
+public:
+	string type, name, location;
+
+	Entry();
+	Entry(string _type, string _name, string _location);
+};
+
+class Level
+{
+public:
+	list<Entry> entry;
+
+	Level();
+};
+
 
 }
 

@@ -34,5 +34,8 @@ g++ --std=c++11 *.cc -o parser
 
 ### Running Application
 ```sh
-./parser < SampleTestInput.txt
+./parser
 ```
+- Standard Input: source code
+- Standard Output: AST from given source code
+- Standard Error: Symnol table from given source code

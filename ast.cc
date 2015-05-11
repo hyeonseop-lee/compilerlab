@@ -12,6 +12,10 @@ string Base::toString()
 	return "";
 }
 
+void Base::traverse(Traversal *traversal, int level, Level *current)
+{
+}
+
 List::List(Base *_head, List *_tail)
 	: head(_head), tail(_tail)
 {
@@ -75,6 +79,11 @@ string Identifier::toString()
 	return name->toString();
 }
 
+void Identifier::traverseWithType(Traversal *traversal, int level, Level *current, Type *type)
+{
+	current->entry.push_back(Entry(type->toString(), name->toString(), "line " + to_string(name->pos)));
+}
+
 IndexedIdentifier::IndexedIdentifier(Symbol *_name, IntNum *_index)
 	: Identifier(_name), index(_index)
 {
@@ -83,6 +92,11 @@ IndexedIdentifier::IndexedIdentifier(Symbol *_name, IntNum *_index)
 string IndexedIdentifier::toString()
 {
 	return name->toString() + "[" + index->toString() + "]";
+}
+
+void IndexedIdentifier::traverseWithType(Traversal *traversal, int level, Level *current, Type *type)
+{
+	current->entry.push_back(Entry(type->toString() + "[]", name->toString(), "line " + to_string(name->pos)));
 }
 
 Declaration::Declaration(Type *_type, List *_identifier)
@@ -111,6 +125,14 @@ string Declaration::toString()
 	return res;
 }
 
+void Declaration::traverse(Traversal *traversal, int level, Level *current)
+{
+	for(auto it = identifier.begin(); it != identifier.end(); it++)
+	{
+		(*it)->traverseWithType(traversal, level, current, type);
+	}
+}
+
 Parameter::Parameter(Type *_type, Identifier *_identifier)
 	: Base(), type(_type), identifier(_identifier)
 {
@@ -119,6 +141,11 @@ Parameter::Parameter(Type *_type, Identifier *_identifier)
 string Parameter::toString()
 {
 	return type->toString() + " " + identifier->toString();
+}
+
+void Parameter::traverse(Traversal *traversal, int level, Level *current)
+{
+	identifier->traverseWithType(traversal, level, current, type);
 }
 
 Expr::Expr()
@@ -327,6 +354,11 @@ string WhileStmt::toString()
 	return "while(" + expr->toString() + ")\n" + stmt->toString();
 }
 
+void WhileStmt::traverse(Traversal *traversal, int level, Level * current)
+{
+	stmt->traverse(traversal, level, current);
+}
+
 DoWhileStmt::DoWhileStmt(Expr *_expr, Stmt *_stmt)
 	: WhileStmt(_expr, _stmt)
 {
@@ -347,6 +379,11 @@ string ForStmt::toString()
 	return "for(" + first->toString() + ";" + second->toString() + ";" + third->toString() + ")\n" + stmt->toString();
 }
 
+void ForStmt::traverse(Traversal *traversal, int level, Level *current)
+{
+	stmt->traverse(traversal, level, current);
+}
+
 IfStmt::IfStmt(Expr *_expr, Stmt *_than, Stmt *__else)
 	: Stmt(), expr(_expr), than(_than), _else(__else)
 {
@@ -360,6 +397,15 @@ string IfStmt::toString()
 		res += "\nelse\n" + _else->toString();
 	}
 	return res;
+}
+
+void IfStmt::traverse(Traversal *traversal, int level, Level *current)
+{
+	than->traverse(traversal, level, current);
+	if(_else)
+	{
+		_else->traverse(traversal, level, current);
+	}
 }
 
 Case::Case(IntNum *_index, List *_stmt, bool __break)
@@ -385,6 +431,14 @@ string Case::toString()
 		res += "\nbreak;";
 	}
 	return res;
+}
+
+void Case::traverse(Traversal *traversal, int level, Level *current)
+{
+	for(auto it = stmt.begin(); it != stmt.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
 }
 
 DefaultCase::DefaultCase(List *_stmt, bool __break)
@@ -428,6 +482,14 @@ string SwitchStmt::toString()
 	return res;
 }
 
+void SwitchStmt::traverse(Traversal *traversal, int level, Level *current)
+{
+	for(auto it = _case.begin(); it != _case.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
+}
+
 CompoundStmt::CompoundStmt(List *_declaration, List *_stmt)
 	: Stmt()
 {
@@ -458,6 +520,21 @@ string CompoundStmt::toString()
 	return res;
 }
 
+void CompoundStmt::traverse(Traversal *traversal, int level, Level *current)
+{
+	level++;
+	current = new Level;
+	traversal->level[level].push_back(current);
+	for(auto it = declaration.begin(); it != declaration.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
+	for(auto it = stmt.begin(); it != stmt.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
+}
+
 Function::Function(Type *_type, Symbol *_name, List *_parameter, CompoundStmt *_compoundStmt)
 	: Base(), type(_type), name(_name), compoundStmt(_compoundStmt)
 {
@@ -482,6 +559,38 @@ string Function::toString()
 	}
 	res += ")\n" + compoundStmt->toString();
 	return res;
+}
+
+void Function::traverse(Traversal *traversal, int level, Level *current)
+{
+	string save;
+	save += type->toString() + "(*)(";
+	for(auto it = parameter.begin(); it != parameter.end(); it++)
+	{
+		if(it != parameter.begin())
+		{
+			save += ", ";
+		}
+		save += (*it)->toString();
+	}
+	save += ")";
+	current->entry.push_back(Entry(save, name->toString(), "line " + to_string(name->pos)));
+
+	level++;
+	current = new Level;
+	traversal->level[level].push_back(current);
+	for(auto it = parameter.begin(); it != parameter.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
+	for(auto it = compoundStmt->declaration.begin(); it != compoundStmt->declaration.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
+	for(auto it = compoundStmt->stmt.begin(); it != compoundStmt->stmt.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
 }
 
 Program::Program(List *_declaration, List *_function)
@@ -511,6 +620,42 @@ string Program::toString()
 		res += (*it)->toString() + "\n";
 	}
 	return res;
+}
+
+void Program::traverse(Traversal *traversal, int level, Level *current)
+{
+	if(!current)
+	{
+		current = new Level;
+		traversal->level[level].push_back(current);
+	}
+	for(auto it = declaration.begin(); it != declaration.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
+	for(auto it = function.begin(); it != function.end(); it++)
+	{
+		(*it)->traverse(traversal, level, current);
+	}
+}
+
+Traversal::Traversal()
+{
+}
+
+Entry::Entry()
+{
+}
+
+Entry::Entry(string _type, string _name, string _location)
+	: type(_type)
+	, name(_name)
+	, location(_location)
+{
+}
+
+Level::Level()
+{
 }
 
 }
