@@ -38,4 +38,4 @@ g++ --std=c++11 *.cc -o parser
 ```
 - Standard Input: source code
 - Standard Output: AST from given source code
-- Standard Error: Symnol table from given source code
+- Standard Error: warning and error messages from compile
