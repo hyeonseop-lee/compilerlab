@@ -1,53 +1,38 @@
 #include <string>
 #include <iostream>
+#include <stdlib.h>
 
 #include "Parser.ih"
 #include "ast.h"
 
 using namespace std;
+using namespace std::placeholders;
 using namespace ast;
 
 Program *Program::program;
 
+void warning(int line, string message, string code)
+{
+	fprintf(stderr, "line %d: warning: %s\n", line, message.c_str());
+	fprintf(stderr, "\t%s\n", code.c_str());
+}
+
+void error(int line, string message, string code)
+{
+	fprintf(stderr, "line %d: error: %s\n", line, message.c_str());
+	fprintf(stderr, "\t%s\n", code.c_str());
+	exit(1);
+}
+
 int main()
 {
 	int t;
-	Traversal traversal;
 	Parser parser;
+	function<void(int, string, string)> f = bind(&warning, _1, _2, _3);
 	if(parser.parse() == 0)
 	{
+		Program::program->traverse(new Scope(NULL, NULL), bind(&warning, _1, _2, _3), bind(&error, _1, _2, _3));
 		cout << Program::program->toString() << endl;
-		Program::program->traverse(&traversal, 0, NULL);
-		for(auto it = traversal.level.begin(); it != traversal.level.end(); it++)
-		{
-			for(auto jt = it->second.begin(); jt != it->second.end(); )
-			{
-				if((*jt)->entry.empty())
-				{
-					delete *jt;
-					jt = it->second.erase(jt);
-				}
-				else
-				{
-					jt++;
-				}
-			}
-			t = 'a';
-			for(auto jt = it->second.begin(); jt != it->second.end(); jt++, t++)
-			{
-				for(auto kt = (*jt)->entry.begin(); kt != (*jt)->entry.end(); kt++)
-				{
-					if(it->second.size() == 1)
-					{
-						fprintf(stderr, "<%s, <%s, %d, %s>>\n", kt->name.c_str(), kt->type.c_str(), it->first, kt->location.c_str());
-					}
-					else
-					{
-						fprintf(stderr, "<%s, <%s, %d%c, %s>>\n", kt->name.c_str(), kt->type.c_str(), it->first, t, kt->location.c_str());
-					}
-				}
-			}
-		}
 	}
 
 	return 0;

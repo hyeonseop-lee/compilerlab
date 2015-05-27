@@ -150,12 +150,12 @@ Type:
 CompoundStmt:
 	LBRACE StmtList RBRACE
 	{
-		$$ = (void *)new CompoundStmt(NULL, (List *)$2);
+		$$ = (void *)new CompoundStmt(d_scanner.lineNr(), NULL, (List *)$2);
 	}
 |
 	LBRACE DeclList StmtList RBRACE
 	{
-		$$ = (void *)new CompoundStmt((List *)$2, (List *)$3);
+		$$ = (void *)new CompoundStmt(d_scanner.lineNr(), (List *)$2, (List *)$3);
 	}
 ;
 
@@ -214,7 +214,7 @@ Stmt:
 |
 	SEMICOLON
 	{
-		$$ = (void *)new Stmt();
+		$$ = (void *)new Stmt(d_scanner.lineNr());
 	}
 ;
 
@@ -259,12 +259,12 @@ Call:
 RetStmt:
 	RETURN SEMICOLON
 	{
-		$$ = (void *)new RetStmt();
+		$$ = (void *)new RetStmt(d_scanner.lineNr());
 	}
 |
 	RETURN Expr SEMICOLON
 	{
-		$$ = (void *)new RetStmt((Expr *)$2);
+		$$ = (void *)new RetStmt(d_scanner.lineNr(), (Expr *)$2);
 	}
 ;
 

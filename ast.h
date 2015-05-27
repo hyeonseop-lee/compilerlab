@@ -4,13 +4,14 @@
 #include <string>
 #include <list>
 #include <map>
+#include <functional>
 
 namespace ast
 {
 
-class Traversal;
-class Entry;
-class Level;
+class Scope;
+class AbstractType;
+class AbstractFunctionType;
 
 using namespace std;
 
@@ -20,7 +21,15 @@ public:
 	Base();
 
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
+};
+
+class Pos
+{
+public:
+	size_t pos;
+
+	Pos(size_t _pos);
 };
 
 class List
@@ -35,10 +44,9 @@ public:
 };
 
 class Symbol:
-	public Base
+	public Base, public Pos
 {
 public:
-	size_t pos;
 	string symbol;
 
 	Symbol(size_t _pos, string _symbol);
@@ -85,7 +93,7 @@ public:
 
 	Identifier(Symbol *_name);
 	virtual string toString();
-	virtual void traverseWithType(Traversal *traversal, int level, Level *current, Type *type);
+	virtual bool indexed(){ return false; }
 };
 
 class IndexedIdentifier:
@@ -96,7 +104,7 @@ public:
 
 	IndexedIdentifier(Symbol *_name, IntNum *_index);
 	virtual string toString();
-	virtual void traverseWithType(Traversal *traversal, int level, Level *current, Type *type);
+	virtual bool indexed(){ return true; }
 };
 
 class Declaration:
@@ -108,7 +116,7 @@ public:
 
 	Declaration(Type *_type, List *_identifier);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class Parameter:
@@ -120,14 +128,15 @@ public:
 
 	Parameter(Type *_type, Identifier *_identifier);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class Expr:
-	public Base
+	public Base, public Pos
 {
 public:
-	Expr();
+	Expr(size_t _pos);
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error) = 0;
 };
 
 class UnOpExpr:
@@ -143,6 +152,7 @@ public:
 
 	UnOpExpr(UnOp _unOp, Expr *_expr);
 	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class BinOpExpr:
@@ -160,6 +170,7 @@ public:
 
 	BinOpExpr(Expr *_left, BinOp _binOp, Expr *_right);
 	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class IntNumExpr:
@@ -170,6 +181,7 @@ public:
 
 	IntNumExpr(IntNum *_intNum);
 	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class FloatNumExpr:
@@ -180,6 +192,19 @@ public:
 
 	FloatNumExpr(FloatNum *_floatNum);
 	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
+};
+
+class TypeCastExpr:
+	public Expr
+{
+public:
+	Type *type;
+	Expr *expr;
+
+	TypeCastExpr(Type *_type, Expr *_expr);
+	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class SymbolExpr:
@@ -190,6 +215,8 @@ public:
 
 	SymbolExpr(Symbol *_name);
 	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
+	virtual bool indexed(){ return false; }
 };
 
 class IndexedSymbolExpr:
@@ -200,18 +227,20 @@ public:
 
 	IndexedSymbolExpr(Symbol *_name, Expr *_index);
 	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
+	virtual bool indexed(){ return true; }
 };
 
 class Stmt:
-	public Base
+	public Base, public Pos
 {
 public:
-	Stmt();
+	Stmt(size_t _pos);
 	virtual string toString();
 };
 
 class Call:
-	public Stmt, Expr
+	public Stmt, public Expr
 {
 public:
 	Symbol *name;
@@ -219,6 +248,7 @@ public:
 
 	Call(Symbol *_name, List *_expr = NULL);
 	virtual string toString();
+	virtual AbstractType *getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class CallStmt:
@@ -240,17 +270,18 @@ public:
 
 	Assign(Symbol *_name, Expr *_expr);
 	virtual string toString();
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class IndexedAssign:
 	public Assign
-
 {
 public:
 	Expr *index;
 
 	IndexedAssign(Symbol *_name, Expr *_index, Expr *_expr);
 	virtual string toString();
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class AssignStmt:
@@ -261,6 +292,7 @@ public:
 
 	AssignStmt(Assign *_assign);
 	virtual string toString();
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class RetStmt:
@@ -269,8 +301,9 @@ class RetStmt:
 public:
 	Expr *expr;
 
-	RetStmt(Expr *_expr = NULL);
+	RetStmt(size_t _pos, Expr *_expr = NULL);
 	virtual string toString();
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class WhileStmt:
@@ -282,7 +315,7 @@ public:
 
 	WhileStmt(Expr *_expr, Stmt *_stmt);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class DoWhileStmt:
@@ -304,7 +337,7 @@ public:
 
 	ForStmt(Assign *_first, Expr *_second, Assign *_third, Stmt *_stmt);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class IfStmt:
@@ -316,7 +349,7 @@ public:
 
 	IfStmt(Expr *_expr, Stmt *_than, Stmt *__else = NULL);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *table);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class Case:
@@ -329,7 +362,7 @@ public:
 
 	Case(IntNum *_index, List *_stmt, bool __break);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class DefaultCase:
@@ -344,12 +377,12 @@ class SwitchStmt:
 	public Stmt
 {
 public:
-	Identifier *identifier;
+	Expr *expr;
 	list<Case *> _case;
 
 	SwitchStmt(Identifier *_identifier, List *__case);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class CompoundStmt:
@@ -359,9 +392,9 @@ public:
 	list<Declaration *> declaration;
 	list<Stmt *> stmt;
 
-	CompoundStmt(List *_declaration, List *_stmt);
+	CompoundStmt(size_t _pos, List *_declaration, List *_stmt);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 
@@ -376,7 +409,7 @@ public:
 
 	Function(Type *_type, Symbol *_name, List *_parameter, CompoundStmt *_compoundStmt);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
 class Program:
@@ -384,38 +417,44 @@ class Program:
 {
 public:
 	list<Declaration *> declaration;
-	list<Function *> function;
+	list<Function *> func;
 
 	static Program *program;
 
-	Program(List *_declaration, List *_function);
+	Program(List *_declaration, List *_func);
 	virtual string toString();
-	virtual void traverse(Traversal *traversal, int level, Level *current);
+	virtual void traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error);
 };
 
-class Traversal
+class Scope
 {
 public:
-	map<int, list<Level *> > level;
+	Scope *parent;
+	list<pair<AbstractType *, Symbol *> > symbol;
+	AbstractFunctionType *func;
 
-	Traversal();
+	Scope(Scope *_parent, AbstractFunctionType *_func);
+	AbstractType *getType(Symbol *_symbol);
 };
 
-class Entry
+class AbstractType
 {
 public:
-	string type, name, location;
+	Type *type;
+	bool indexed;
 
-	Entry();
-	Entry(string _type, string _name, string _location);
+	AbstractType(Type *_type, bool _indexed = false);
+	virtual bool func(){ return false; }
 };
 
-class Level
+class AbstractFunctionType:
+	public AbstractType
 {
 public:
-	list<Entry> entry;
+	list<AbstractType *> parameter;
 
-	Level();
+	AbstractFunctionType(Type *_type, bool _indexed = false);
+	virtual bool func(){ return true; }
 };
 
 
