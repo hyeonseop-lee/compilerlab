@@ -240,7 +240,7 @@ public:
 };
 
 class Call:
-	public Stmt, public Expr
+	public Expr
 {
 public:
 	Symbol *name;

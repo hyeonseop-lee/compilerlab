@@ -347,7 +347,7 @@ string Stmt::toString()
 }
 
 Call::Call(Symbol *_name, List *_expr)
-	: Stmt(_name->pos), Expr(_name->pos), name(_name)
+	: Expr(_name->pos), name(_name)
 {
 	List *it;
 	for(it = _expr; it; it = it->next())
