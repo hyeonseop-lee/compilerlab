@@ -37,5 +37,12 @@ g++ --std=c++11 *.cc -o parser
 ./parser
 ```
 - Standard Input: source code
-- Standard Output: AST from given source code
+- Standard Output: compiled T-Machine code
 - Standard Error: warning and error messages from compile
+
+### Sample Program
+```sh
+./parser < SampleTestInput.txt > SampleTestInput.t
+T SampleTestInput.t SampleTestCost.txt
+```
+Program calculates pi with precision given by input.

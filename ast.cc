@@ -429,14 +429,14 @@ int TypeCastExpr::toInst(Scope *scope, function<void(int, string, string)> warni
 	{
 		if(type->type == Type::FLOAT)
 		{
-			printf("F2I VR(%d)@ VR(%d)\n", reg, reg);
+			printf("I2F VR(%d)@ VR(%d)\n", reg, reg);
 		}
 	}
 	else
 	{
 		if(type->type == Type::INT)
 		{
-			printf("I2F VR(%d)@ VR(%d)\n", reg, reg);
+			printf("F2I VR(%d)@ VR(%d)\n", reg, reg);
 		}
 	}
 	return reg;
@@ -600,7 +600,6 @@ int Call::toInst(Scope *scope, function<void(int, string, string)> warning, func
 	}
 	else
 	{
-		printf("// calling scanf\n");
 		symbol = (SymbolExpr *)*expr.begin();
 		stk++;
 		if(symbol->indexed())
@@ -1280,7 +1279,6 @@ int Scope::ralloc()
 	int reg;
 	for(reg = 0; regs.find(reg) != regs.end(); reg++);
 	regs.insert(reg);
-	printf("// allocating %d\n", reg);
 	return reg;
 }
 
@@ -1295,7 +1293,6 @@ int Scope::lalloc()
 
 void Scope::free(int reg)
 {
-	printf("// freeing %d\n", reg);
 	regs.erase(reg);
 }
 
