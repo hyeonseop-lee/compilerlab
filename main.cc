@@ -28,11 +28,9 @@ int main()
 {
 	int t;
 	Parser parser;
-	function<void(int, string, string)> f = bind(&warning, _1, _2, _3);
 	if(parser.parse() == 0)
 	{
-		Program::program->traverse(new Scope(NULL, NULL), bind(&warning, _1, _2, _3), bind(&error, _1, _2, _3));
-		cout << Program::program->toString() << endl;
+		Program::program->toInst(new Scope(NULL, NULL), bind(&warning, _1, _2, _3), bind(&error, _1, _2, _3));
 	}
 
 	return 0;

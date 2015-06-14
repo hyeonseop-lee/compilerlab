@@ -1,5 +1,7 @@
 #include "ast.h"
 
+#include <queue>
+
 namespace ast
 {
 
@@ -12,7 +14,7 @@ string Base::toString()
 	return "";
 }
 
-void Base::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int Base::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 }
 
@@ -120,12 +122,26 @@ string Declaration::toString()
 	return res;
 }
 
-void Declaration::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int Declaration::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
+	int size = 0;
 	for(auto it = identifier.begin(); it != identifier.end(); it++)
 	{
+		scope->addVar((*it)->name, scope->size + size + 1);
+		size++;
+		if((*it)->indexed())
+		{
+			printf("MOVE MEM(FP@)(%d) MEM(FP@)(%d)\n", scope->size + size + 1, scope->size + size);
+			size += ((IndexedIdentifier *)(*it))->index->num;
+		}
 		scope->symbol.push_back(make_pair(new AbstractType(type, (*it)->indexed()), (*it)->name));
 	}
+	if(size)
+	{
+		printf("ADD SP@ %d SP\n", size);
+		scope->size += size;
+	}
+	return 0;
 }
 
 Parameter::Parameter(Type *_type, Identifier *_identifier)
@@ -138,9 +154,12 @@ string Parameter::toString()
 	return type->toString() + " " + identifier->toString();
 }
 
-void Parameter::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int Parameter::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
+	scope->addVar(identifier->name, scope->size - 2);
+	scope->size--;
 	scope->symbol.push_back(make_pair(new AbstractType(type, identifier->indexed()), identifier->name));
+	return 0;
 }
 
 Expr::Expr(size_t _pos)
@@ -168,6 +187,20 @@ AbstractType *UnOpExpr::getType(Scope *scope, function<void(int, string, string)
 	if(type->indexed) error(pos, "Type error", expr->toString() + " is an array");
 	if(type->func()) error(pos, "Type error", expr->toString() + " is a function");
 	return type;
+}
+
+int UnOpExpr::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int reg = expr->toInst(scope, warning, error);
+	if(getType(scope, warning, error)->type->type == Type::INT)
+	{
+		printf("SUB 0 VR(%d)@ VR(%d)\n", reg, reg);
+	}
+	else
+	{
+		printf("FSUB 0.0 VR(%d)@ VR(%d)\n", reg, reg);
+	}
+	return reg;
 }
 
 BinOpExpr::BinOpExpr(Expr *_left, BinOp _binOp, Expr *_right)
@@ -253,6 +286,80 @@ AbstractType *BinOpExpr::getType(Scope *scope, function<void(int, string, string
 	return new AbstractType(new Type(Type::INT));
 }
 
+int BinOpExpr::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int regl = left->toInst(scope, warning, error), regr = right->toInst(scope, warning, error), reg = scope->ralloc();
+	int lt, lf, lj;
+	scope->free(regl);
+	scope->free(regr);
+	if(left->getType(scope, warning, error)->type->type == Type::FLOAT)
+	{
+		printf("F");
+	}
+	switch(binOp)
+	{
+		case PLUS:
+			printf("ADD VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			return reg;
+		case MINUS:
+			printf("SUB VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			return reg;
+		case MUL:
+			printf("MUL VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			return reg;
+		case DIV:
+			printf("DIV VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			return reg;
+		default:
+			break;
+	}
+	lt = scope->lalloc();
+	lf = scope->lalloc();
+	lj = scope->lalloc();
+	switch(binOp)
+	{
+		case EQ:
+			printf("SUB VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			printf("JMPZ VR(%d)@ L%d\n", reg, lt);
+			printf("JMP L%d\n", lf);
+			break;
+		case NE:
+			printf("SUB VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			printf("JMPZ VR(%d)@ L%d\n", reg, lf);
+			printf("JMP L%d\n", lt);
+			break;
+		case LT:
+			printf("SUB VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			printf("JMPN VR(%d)@ L%d\n", reg, lt);
+			printf("JMP L%d\n", lf);
+			break;
+		case LE:
+			printf("SUB VR(%d)@ VR(%d)@ VR(%d)\n", regr, regl, reg);
+			printf("JMPN VR(%d)@ L%d\n", reg, lf);
+			printf("JMP L%d\n", lt);
+			break;
+		case GT:
+			printf("SUB VR(%d)@ VR(%d)@ VR(%d)\n", regr, regl, reg);
+			printf("JMPN VR(%d)@ L%d\n", reg, lt);
+			printf("JMP L%d\n", lf);
+			break;
+		case GE:
+			printf("SUB VR(%d)@ VR(%d)@ VR(%d)\n", regl, regr, reg);
+			printf("JMPN VR(%d)@ L%d\n", reg, lf);
+			printf("JMP L%d\n", lt);
+			break;
+		default:
+			break;
+	}
+	printf("LAB L%d\n", lt);
+	printf("MOVE 1 VR(%d)\n", reg);
+	printf("JMP L%d\n", lj);
+	printf("LAB L%d\n", lf);
+	printf("MOVE 0 VR(%d)\n", reg);
+	printf("LAB L%d\n", lj);
+	return reg;
+}
+
 IntNumExpr::IntNumExpr(IntNum *_intNum)
 	: Expr(_intNum->pos), intNum(_intNum)
 {
@@ -268,6 +375,13 @@ AbstractType *IntNumExpr::getType(Scope *scope, function<void(int, string, strin
 	return new AbstractType(new Type(Type::INT));
 }
 
+int IntNumExpr::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int reg = scope->ralloc();
+	printf("MOVE %d VR(%d)\n", intNum->num, reg);
+	return reg;
+}
+
 FloatNumExpr::FloatNumExpr(FloatNum *_floatNum)
 	: Expr(_floatNum->pos), floatNum(_floatNum)
 {
@@ -281,6 +395,13 @@ string FloatNumExpr::toString()
 AbstractType *FloatNumExpr::getType(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	return new AbstractType(new Type(Type::FLOAT));
+}
+
+int FloatNumExpr::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int reg = scope->ralloc();
+	printf("MOVE %.6f VR(%d)\n", floatNum->num, reg);
+	return reg;
 }
 
 TypeCastExpr::TypeCastExpr(Type *_type, Expr *_expr)
@@ -301,6 +422,26 @@ AbstractType *TypeCastExpr::getType(Scope *scope, function<void(int, string, str
 	return new AbstractType(type);
 }
 
+int TypeCastExpr::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int reg = expr->toInst(scope, warning, error);
+	if(expr->getType(scope, warning, error)->type->type == Type::INT)
+	{
+		if(type->type == Type::FLOAT)
+		{
+			printf("F2I VR(%d)@ VR(%d)\n", reg, reg);
+		}
+	}
+	else
+	{
+		if(type->type == Type::INT)
+		{
+			printf("I2F VR(%d)@ VR(%d)\n", reg, reg);
+		}
+	}
+	return reg;
+}
+
 SymbolExpr::SymbolExpr(Symbol *_name)
 	: Expr(_name->pos), name(_name)
 {
@@ -316,6 +457,20 @@ AbstractType *SymbolExpr::getType(Scope *scope, function<void(int, string, strin
 	AbstractType *type = scope->getType(name);
 	if(type == NULL) error(pos, "Not defined", name->toString());
 	return type;
+}
+
+int SymbolExpr::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int reg = scope->ralloc();
+	if(scope->isLocal(name))
+	{
+		printf("MOVE MEM(FP@(%d))@ VR(%d)\n", scope->getVar(name), reg);
+	}
+	else
+	{
+		printf("MOVE MEM(%d)@ VR(%d)\n", scope->getVar(name), reg);
+	}
+	return reg;
 }
 
 IndexedSymbolExpr::IndexedSymbolExpr(Symbol *_name, Expr *_index)
@@ -334,6 +489,21 @@ AbstractType *IndexedSymbolExpr::getType(Scope *scope, function<void(int, string
 	if(type == NULL) error(pos, "Not defined", name->toString());
 	if(!type->indexed) error(pos, "Type error", name->toString() + " is not an array");
 	return new AbstractType(type->type);
+}
+
+int IndexedSymbolExpr::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int reg = scope->ralloc(), regi = index->toInst(scope, warning, error);
+	if(scope->isLocal(name))
+	{
+		printf("MOVE MEM(FP@(%d))@(VR(%d)@)@ VR(%d)\n", scope->getVar(name), regi, reg);
+	}
+	else
+	{
+		printf("MOVE MEM(%d)@(VR(%d)@)@ VR(%d)\n", scope->getVar(name), regi, reg);
+	}
+	scope->free(regi);
+	return reg;
 }
 
 Stmt::Stmt(size_t _pos)
@@ -379,6 +549,10 @@ AbstractType *Call::getType(Scope *scope, function<void(int, string, string)> wa
 	AbstractFunctionType *func;
 	list<AbstractType *> ::iterator it;
 	list<Expr *> ::iterator jt;
+	if(name->symbol == "printf" || name->symbol == "scanf")
+	{
+		error(name->pos, "Type error", toString());
+	}
 	if(type == NULL) error(name->pos, "Not defined", name->toString());
 	if(type->indexed) error(name->pos, "Type error", name->toString() + " is an array");
 	if(!type->func()) error(name->pos, "Type error", name->toString() + " is not a function");
@@ -407,6 +581,89 @@ AbstractType *Call::getType(Scope *scope, function<void(int, string, string)> wa
 	return new AbstractType(func->type);
 }
 
+int Call::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	int reg, lr, stk = 0;
+	SymbolExpr *symbol;
+	for(auto it = scope->regs.begin(); it != scope->regs.end(); it++)
+	{
+		printf("MOVE VR(%d)@ MEM(SP@)(%d)\n", *it, ++stk);
+	}
+	if(name->symbol != "scanf")
+	{
+		for(auto it = expr.rbegin(); it != expr.rend(); it++)
+		{
+			reg = (*it)->toInst(scope, warning, error);
+			printf("MOVE VR(%d)@ MEM(SP@)(%d)\n", reg, ++stk);
+			scope->free(reg);
+		}
+	}
+	else
+	{
+		printf("// calling scanf\n");
+		symbol = (SymbolExpr *)*expr.begin();
+		stk++;
+		if(symbol->indexed())
+		{
+			reg = ((IndexedSymbolExpr *)symbol)->index->toInst(scope, warning, error);
+			if(scope->isLocal(symbol->name))
+			{
+				printf("MOVE MEM(FP@(%d))@(VR(%d)@) MEM(SP@)(1)\n", scope->getVar(symbol->name), reg);
+			}
+			else
+			{
+				printf("MOVE MEM(%d)@(VR(%d)@) MEM(SP@)(1)\n", scope->getVar(symbol->name), reg);
+			}
+			scope->free(reg);
+		}
+		else
+		{
+			if(scope->isLocal(symbol->name))
+			{
+				printf("MOVE MEM(FP@(%d)) MEM(SP@)(1)\n", scope->getVar(symbol->name));
+			}
+			else
+			{
+				printf("MOVE MEM(%d) MEM(SP@)(1)\n", scope->getVar(symbol->name));
+			}
+		}
+	}
+	lr = scope->lalloc();
+	printf("ADD SP@ %d SP\n", stk + 1);
+	printf("MOVE L%d MEM(SP@)\n", lr);
+	if(name->symbol == "scanf")
+	{
+		if(symbol->getType(scope, warning, error)->type->type == Type::INT)
+		{
+			printf("JMP Fscanfi\n");
+		}
+		else
+		{
+			printf("JMP Fscanff\n");
+		}
+	}
+	else
+	{
+		printf("JMP F%s\n", name->symbol.c_str());
+	}
+	printf("LAB L%d\n", lr);
+	reg = scope->ralloc();
+	if(name->symbol != "printf" && name->symbol != "scanf")
+	{
+		printf("MOVE VR@ VR(%d)\n", reg);
+	}
+	printf("SUB SP@ %d SP\n", stk + 1);
+	stk = 0;
+	for(auto it = scope->regs.begin(); it != scope->regs.end(); it++)
+	{
+		if(*it != reg)
+		{
+			printf("MOVE MEM(SP@)(%d)@ VR(%d)\n", ++stk, *it);
+		}
+	}
+	return reg;
+}
+
 CallStmt::CallStmt(Call *_call)
 	: Stmt(_call->name->pos), call(_call)
 {
@@ -415,6 +672,19 @@ CallStmt::CallStmt(Call *_call)
 string CallStmt::toString()
 {
 	return call->toString() + ";";
+}
+
+int CallStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	if(call->expr.size() != 1 || (call->name->symbol != "printf" && call->name->symbol != "scanf"))
+	{
+		call->getType(scope, warning, error);
+	}
+	else
+	{
+		(*call->expr.begin())->getType(scope, warning, error);
+	}
+	scope->free(call->toInst(scope, warning, error));
 }
 
 Assign::Assign(Symbol *_name, Expr *_expr)
@@ -427,7 +697,7 @@ string Assign::toString()
 	return name->toString() + "=" + expr->toString();
 }
 
-void Assign::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int Assign::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	AbstractType *left = scope->getType(name), *right = expr->getType(scope, warning, error);
 	if(left == NULL) error(pos, "Not defined", name->toString());
@@ -440,6 +710,16 @@ void Assign::traverse(Scope *scope, function<void(int, string, string)> warning,
 		warning(pos, "Implicit type casting", toString());
 		expr = new TypeCastExpr(left->type, expr);
 	}
+	int reg = expr->toInst(scope, warning, error);
+	if(scope->isLocal(name))
+	{
+		printf("MOVE VR(%d)@ MEM(FP@(%d))\n", reg, scope->getVar(name));
+	}
+	else
+	{
+		printf("MOVE VR(%d)@ MEM(%d)\n", reg, scope->getVar(name));
+	}
+	scope->free(reg);
 }
 
 IndexedAssign::IndexedAssign(Symbol *_name, Expr *_index, Expr *_expr)
@@ -452,7 +732,7 @@ string IndexedAssign::toString()
 	return name->toString() + "[" + index->toString() + "]=" + expr->toString();
 }
 
-void IndexedAssign::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int IndexedAssign::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	AbstractType *left = scope->getType(name), *right = expr->getType(scope, warning, error), *_index = index->getType(scope, warning, error);
 	if(!left->indexed) error(pos, "Type error", name->toString() + " is not an array");
@@ -471,6 +751,18 @@ void IndexedAssign::traverse(Scope *scope, function<void(int, string, string)> w
 		warning(pos, "Implicit type casting", toString());
 		expr = new TypeCastExpr(left->type, expr);
 	}
+
+	int reg = expr->toInst(scope, warning, error), regi = index->toInst(scope, warning, error);
+	if(scope->isLocal(name))
+	{
+		printf("MOVE VR(%d)@ MEM(FP@(%d))@(VR(%d)@)\n", reg, scope->getVar(name), regi);
+	}
+	else
+	{
+		printf("MOVE VR(%d)@ MEM(%d)@(VR(%d)@)\n", reg, scope->getVar(name), regi);
+	}
+	scope->free(reg);
+	scope->free(regi);
 }
 
 AssignStmt::AssignStmt(Assign *_assign)
@@ -483,9 +775,9 @@ string AssignStmt::toString()
 	return assign->toString() + ";";
 }
 
-void AssignStmt::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int AssignStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
-	assign->traverse(scope, warning, error);
+	assign->toInst(scope, warning, error);
 }
 
 RetStmt::RetStmt(size_t _pos, Expr *_expr)
@@ -505,9 +797,10 @@ string RetStmt::toString()
 	}
 }
 
-void RetStmt::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int RetStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	AbstractType *type;
+	int reg;
 	if(expr == NULL) error(pos, "Type error", "Should return a value");
 	type = expr->getType(scope, warning, error);
 	if(type->indexed) error(pos, "Type error", expr->toString() + " is an array");
@@ -517,6 +810,14 @@ void RetStmt::traverse(Scope *scope, function<void(int, string, string)> warning
 		warning(pos, "Implicit type casting", toString());
 		expr = new TypeCastExpr(scope->func->type, expr);
 	}
+	reg = expr->toInst(scope, warning, error);
+	printf("MOVE VR(%d)@ VR\n", reg);
+	scope->free(reg);
+	printf("MOVE FP@ SP\n");
+	printf("MOVE MEM(SP@)@ FP\n");
+	printf("SUB SP@ 1 SP\n");
+	printf("JMP MEM(SP@)@\n");
+	return 0;
 }
 
 WhileStmt::WhileStmt(Expr *_expr, Stmt *_stmt)
@@ -529,9 +830,10 @@ string WhileStmt::toString()
 	return "while(" + expr->toString() + ")\n" + stmt->toString();
 }
 
-void WhileStmt::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int WhileStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	AbstractType *type = expr->getType(scope, warning, error);
+	int reg, lt, lf;
 	if(type->indexed) error(pos, "Type error", expr->toString() + " is an array");
 	if(type->func()) error(pos, "Type error", expr->toString() + " is a function");
 	if(type->type->type == Type::FLOAT)
@@ -539,7 +841,16 @@ void WhileStmt::traverse(Scope *scope, function<void(int, string, string)> warni
 		warning(pos, "Implicit type casting", string("while(") + expr->toString() + ")");
 		expr = new TypeCastExpr(new Type(Type::INT), expr);
 	}
-	stmt->traverse(scope, warning, error);
+	lt = scope->lalloc();
+	lf = scope->lalloc();
+	printf("LAB L%d\n", lt);
+	reg = expr->toInst(scope, warning, error);
+	printf("JMPZ VR(%d)@ L%d\n", reg, lf);
+	scope->free(reg);
+	stmt->toInst(scope, warning, error);
+	printf("JMP L%d\n", lt);
+	printf("LAB L%d\n", lf);
+	return 0;
 }
 
 DoWhileStmt::DoWhileStmt(Expr *_expr, Stmt *_stmt)
@@ -552,6 +863,29 @@ string DoWhileStmt::toString()
 	return "do\n" + stmt->toString() + "\nwhile(" + expr->toString() + ");";
 }
 
+int DoWhileStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+{
+	AbstractType *type = expr->getType(scope, warning, error);
+	int reg, lt, lf;
+	if(type->indexed) error(pos, "Type error", expr->toString() + " is an array");
+	if(type->func()) error(pos, "Type error", expr->toString() + " is a function");
+	if(type->type->type == Type::FLOAT)
+	{
+		warning(pos, "Implicit type casting", string("while(") + expr->toString() + ")");
+		expr = new TypeCastExpr(new Type(Type::INT), expr);
+	}
+	lt = scope->lalloc();
+	lf = scope->lalloc();
+	printf("LAB L%d\n", lt);
+	stmt->toInst(scope, warning, error);
+	reg = expr->toInst(scope, warning, error);
+	printf("JMPZ VR(%d)@ L%d\n", reg, lf);
+	scope->free(reg);
+	printf("JMP L%d\n", lt);
+	printf("LAB L%d\n", lf);
+	return 0;
+}
+
 ForStmt::ForStmt(Assign *_first, Expr *_second, Assign *_third, Stmt *_stmt)
 	: Stmt(_first->name->pos), first(_first), second(_second), third(_third), stmt(_stmt)
 {
@@ -562,10 +896,11 @@ string ForStmt::toString()
 	return "for(" + first->toString() + ";" + second->toString() + ";" + third->toString() + ")\n" + stmt->toString();
 }
 
-void ForStmt::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int ForStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	AbstractType *type;
-	first->traverse(scope, warning, error);
+	int reg, lt, lf;
+	first->toInst(scope, warning, error);
 	type = second->getType(scope, warning, error);
 	if(type->indexed) error(pos, "Type error", second->toString() + " is an array");
 	if(type->func()) error(pos, "Type error", second->toString() + " is a function");
@@ -574,8 +909,17 @@ void ForStmt::traverse(Scope *scope, function<void(int, string, string)> warning
 		warning(pos, "Implicit type casting", string("for(") + first->toString() + ";" + second->toString() + ";" + third->toString() + ")");
 		second = new TypeCastExpr(new Type(Type::INT), second);
 	}
-	third->traverse(scope, warning, error);
-	stmt->traverse(scope, warning, error);
+	lt = scope->lalloc();
+	lf = scope->lalloc();
+	printf("LAB L%d\n", lt);
+	reg = second->toInst(scope, warning, error);
+	printf("JMPZ VR(%d)@ L%d\n", reg, lf);
+	scope->free(reg);
+	stmt->toInst(scope, warning, error);
+	third->toInst(scope, warning, error);
+	printf("JMP L%d\n", lt);
+	printf("LAB L%d\n", lf);
+	return 0;
 }
 
 IfStmt::IfStmt(Expr *_expr, Stmt *_than, Stmt *__else)
@@ -593,9 +937,10 @@ string IfStmt::toString()
 	return res;
 }
 
-void IfStmt::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int IfStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	AbstractType *type;
+	int reg, lt, lf;
 	type = expr->getType(scope, warning, error);
 	if(type->indexed) error(pos, "Type error", expr->toString() + " is an array");
 	if(type->func()) error(pos, "Type error", expr->toString() + " is a function");
@@ -604,11 +949,20 @@ void IfStmt::traverse(Scope *scope, function<void(int, string, string)> warning,
 		warning(pos, "Implicit type casting", "if(" + expr->toString() + ")");
 		expr = new TypeCastExpr(new Type(Type::INT), expr);
 	}
-	than->traverse(scope, warning, error);
+	reg = expr->toInst(scope, warning, error);
+	lt = scope->lalloc();
+	lf = scope->lalloc();
+	printf("JMPZ VR(%d)@ L%d\n", reg, lf);
+	scope->free(reg);
+	than->toInst(scope, warning, error);
+	printf("JMP L%d\n", lt);
+	printf("LAB L%d\n", lf);
 	if(_else)
 	{
-		_else->traverse(scope, warning, error);
+		_else->toInst(scope, warning, error);
 	}
+	printf("LAB L%d\n", lt);
+	return 0;
 }
 
 Case::Case(IntNum *_index, List *_stmt, bool __break)
@@ -636,11 +990,11 @@ string Case::toString()
 	return res;
 }
 
-void Case::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int Case::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	for(auto it = stmt.begin(); it != stmt.end(); it++)
 	{
-		(*it)->traverse(scope, warning, error);
+		(*it)->toInst(scope, warning, error);
 	}
 }
 
@@ -694,8 +1048,10 @@ string SwitchStmt::toString()
 	return res;
 }
 
-void SwitchStmt::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int SwitchStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
+	int reg, val, breakto, ln;
+	queue<int> que;
 	AbstractType *type = expr->getType(scope, warning, error);
 	if(type->indexed) error(pos, "Type error", expr->toString() + " is an array");
 	if(type->func()) error(pos, "Type error", expr->toString() + " is a function");
@@ -704,10 +1060,37 @@ void SwitchStmt::traverse(Scope *scope, function<void(int, string, string)> warn
 		warning(pos, "Implicit type casting", "switch(" + expr->toString() + ")");
 		expr = new TypeCastExpr(new Type(Type::INT), expr);
 	}
+	reg = expr->toInst(scope, warning, error);
+	val = scope->ralloc();
+	breakto = scope->lalloc();
 	for(auto it = _case.begin(); it != _case.end(); it++)
 	{
-		(*it)->traverse(scope, warning, error);
+		ln = scope->lalloc();
+		que.push(ln);
+		if(!(*it)->isDefault())
+		{
+			printf("SUB VR(%d)@ %d VR(%d)\n", reg, (*it)->index->num, val);
+			printf("JMPZ VR(%d)@ L%d\n", val, ln);
+		}
+		else
+		{
+			printf("JMP L%d\n", ln);
+		}
 	}
+	scope->free(val);
+	scope->free(reg);
+	printf("JMP L%d\n", breakto);
+	for(auto it = _case.begin(); it != _case.end(); it++)
+	{
+		printf("LAB L%d\n", que.front());
+		que.pop();
+		(*it)->toInst(scope, warning, error);
+		if((*it)->_break)
+		{
+			printf("JMP L%d\n", breakto);
+		}
+	}
+	printf("LAB L%d\n", breakto);
 }
 
 CompoundStmt::CompoundStmt(size_t _pos, List *_declaration, List *_stmt)
@@ -740,16 +1123,16 @@ string CompoundStmt::toString()
 	return res;
 }
 
-void CompoundStmt::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int CompoundStmt::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	scope = new Scope(scope, scope->func);
 	for(auto it = declaration.begin(); it != declaration.end(); it++)
 	{
-		(*it)->traverse(scope, warning, error);
+		(*it)->toInst(scope, warning, error);
 	}
 	for(auto it = stmt.begin(); it != stmt.end(); it++)
 	{
-		(*it)->traverse(scope, warning, error);
+		(*it)->toInst(scope, warning, error);
 	}
 }
 
@@ -779,7 +1162,7 @@ string Function::toString()
 	return res;
 }
 
-void Function::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int Function::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	AbstractFunctionType *func = new AbstractFunctionType(type);
 
@@ -790,18 +1173,21 @@ void Function::traverse(Scope *scope, function<void(int, string, string)> warnin
 	scope->symbol.push_back(make_pair(func, name));
 	scope = new Scope(scope, func);
 
+	printf("LAB F%s\n", name->symbol.c_str());
+	printf("ADD SP@ 1 SP\n");
+	printf("MOVE FP@ MEM(SP@)\n");
+	printf("MOVE SP@ FP\n");
 	for(auto it = parameter.begin(); it != parameter.end(); it++)
 	{
-		(*it)->traverse(scope, warning, error);
+		(*it)->toInst(scope, warning, error);
 	}
-	for(auto it = compoundStmt->declaration.begin(); it != compoundStmt->declaration.end(); it++)
-	{
-		(*it)->traverse(scope, warning, error);
-	}
-	for(auto it = compoundStmt->stmt.begin(); it != compoundStmt->stmt.end(); it++)
-	{
-		(*it)->traverse(scope, warning, error);
-	}
+	scope->size = 0;
+	compoundStmt->toInst(scope, warning, error);
+	printf("MOVE FP@ SP\n");
+	printf("MOVE MEM(SP@)@ FP\n");
+	printf("SUB SP@ 1 SP\n");
+	printf("JMP MEM(SP@)@\n");
+	return 0;
 }
 
 Program::Program(List *_declaration, List *_func)
@@ -833,21 +1219,43 @@ string Program::toString()
 	return res;
 }
 
-void Program::traverse(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
+int Program::toInst(Scope *scope, function<void(int, string, string)> warning, function<void(int, string, string)> error)
 {
 	scope = new Scope(scope, scope->func);
+	printf("AREA SP\n");
+	printf("AREA FP\n");
+	printf("AREA VR\n");
+	printf("AREA MEM\n");
+	printf("LAB START\n");
+	printf("MOVE 0 FP\n");
+	printf("MOVE 0 SP\n");
+	scope->local = false;
 	for(auto it = declaration.begin(); it != declaration.end(); it++)
 	{
-		(*it)->traverse(scope, warning, error);
+		(*it)->toInst(scope, warning, error);
 	}
+	printf("ADD SP@ 1 SP\n");
+	printf("MOVE END MEM(SP@)\n");
+	printf("JMP Fmain\n");
+	printf("LAB END\n");
 	for(auto it = func.begin(); it != func.end(); it++)
 	{
-		(*it)->traverse(scope, warning, error);
+		(*it)->toInst(scope, warning, error);
 	}
+	printf("LAB Fprintf\n");
+	printf("WRITE MEM(SP@)(-1)@\n");
+	printf("JMP MEM(SP@)@\n");
+	printf("LAB Fscanfi\n");
+	printf("READI MEM(SP@)(-1)@\n");
+	printf("JMP MEM(SP@)@\n");
+	printf("LAB Fscanff\n");
+	printf("READF MEM(SP@)(-1)@\n");
+	printf("JMP MEM(SP@)@\n");
+	return 0;
 }
 
 Scope::Scope(Scope *_parent, AbstractFunctionType *_func)
-	: parent(_parent), func(_func)
+	: parent(_parent), func(_func), local(true), size(0), label(0)
 {
 }
 
@@ -865,6 +1273,53 @@ AbstractType *Scope::getType(Symbol *_symbol)
 		return parent->getType(_symbol);
 	}
 	return NULL;
+}
+
+int Scope::ralloc()
+{
+	int reg;
+	for(reg = 0; regs.find(reg) != regs.end(); reg++);
+	regs.insert(reg);
+	printf("// allocating %d\n", reg);
+	return reg;
+}
+
+int Scope::lalloc()
+{
+	if(parent)
+	{
+		return parent->lalloc();
+	}
+	return label++;
+}
+
+void Scope::free(int reg)
+{
+	printf("// freeing %d\n", reg);
+	regs.erase(reg);
+}
+
+void Scope::addVar(Symbol *_symbol, int loc)
+{
+	vars[_symbol->symbol] = loc;
+}
+
+bool Scope::isLocal(Symbol *_symbol)
+{
+	if(vars.find(_symbol->symbol) != vars.end())
+	{
+		return local;
+	}
+	return parent->isLocal(_symbol);
+}
+
+int Scope::getVar(Symbol *_symbol)
+{
+	if(vars.find(_symbol->symbol) != vars.end())
+	{
+		return vars[_symbol->symbol];
+	}
+	return parent->getVar(_symbol);
 }
 
 AbstractType::AbstractType(Type *_type, bool _indexed)
